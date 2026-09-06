@@ -1,0 +1,18 @@
+// `gradle :solution:run` launches the worker; VSCode uses launch.json mainClass instead.
+application {
+    mainClass = 'foundations.WorkerApp'
+}
+
+// `gradle :solution:runStarter --args="3 4"` starts a MathWorkflow.
+tasks.register('runStarter', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'foundations.Starter'
+}
+
+// `gradle :solution:runSignal --args="5"` sends the submit(int) signal.
+tasks.register('runSignal', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'foundations.SignalSender'
+}

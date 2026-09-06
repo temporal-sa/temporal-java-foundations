@@ -1,0 +1,53 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Worker (debug) — starter",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.WorkerApp",
+      "projectName": "starter",
+      "env": { "TEMPORAL_DEBUG": "true" }
+    },
+    {
+      "name": "Start — starter (a=3 b=4)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.Starter",
+      "projectName": "starter",
+      "args": ["3", "4"]
+    },
+    {
+      "name": "Signal — starter (value=5)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.SignalSender",
+      "projectName": "starter",
+      "args": ["5"]
+    },
+    {
+      "name": "Worker (debug) — solution",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.WorkerApp",
+      "projectName": "solution",
+      "env": { "TEMPORAL_DEBUG": "true" }
+    },
+    {
+      "name": "Start — solution (a=3 b=4)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.Starter",
+      "projectName": "solution",
+      "args": ["3", "4"]
+    },
+    {
+      "name": "Signal — solution (value=5)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "foundations.SignalSender",
+      "projectName": "solution",
+      "args": ["5"]
+    }
+  ]
+}
