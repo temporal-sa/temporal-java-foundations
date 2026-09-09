@@ -3,6 +3,7 @@
 build/
 
 # IDE
+# Note: .run/ (shared IntelliJ run configurations) IS tracked on purpose.
 .idea/
 *.iml
 .classpath

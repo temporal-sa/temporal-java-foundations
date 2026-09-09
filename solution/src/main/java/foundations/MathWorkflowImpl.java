@@ -47,7 +47,7 @@ public class MathWorkflowImpl implements MathWorkflow {
     @Override
     public int run(MathInput in) {
         // >>> BREAKPOINT (workflow): step through the whole pipeline from here. <<<
-        // Requires TEMPORAL_DEBUG=true on the worker (see .vscode/launch.json) so the
+        // Requires TEMPORAL_DEBUG=true on the worker (see .vscode/launch.json or .run/) so the
         // deadlock detector doesn't fire while you sit on a breakpoint.
 
         // ── Lab 1 ────────────────────────────────────────────────────────────

@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Worker (debug) — starter" type="Application" factoryName="Application" nameIsGenerated="false">
+    <!-- TEMPORAL_DEBUG=true keeps the SDK deadlock detector from tripping while you
+         sit on a breakpoint in *workflow* code. -->
+    <envs>
+      <env name="TEMPORAL_DEBUG" value="true" />
+    </envs>
+    <option name="MAIN_CLASS_NAME" value="foundations.WorkerApp" />
+    <module name="temporal-java-foundations.starter.main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

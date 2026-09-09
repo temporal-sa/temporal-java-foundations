@@ -1,4 +1,5 @@
-// `gradle :solution:run` launches the worker; VSCode uses launch.json mainClass instead.
+// `gradle :solution:run` launches the worker; the IDE run configs
+// (.vscode/launch.json, .run/) point at the main class directly instead.
 application {
     mainClass = 'foundations.WorkerApp'
 }

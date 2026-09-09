@@ -37,7 +37,7 @@ public class MathWorkflowImpl implements MathWorkflow {
     @Override
     public int run(MathInput in) {
         // >>> BREAKPOINT (workflow): step through the pipeline from here. <<<
-        // Requires TEMPORAL_DEBUG=true on the worker (see .vscode/launch.json).
+        // Requires TEMPORAL_DEBUG=true on the worker (see .vscode/launch.json or .run/).
 
         // ── Lab 1 ────────────────────────────────────────────────────────────
         // TODO Lab 1: call activities.add(in) and return the sum. Run it, confirm

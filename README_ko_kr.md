@@ -102,7 +102,8 @@ temporal-java-foundations/
 ├── build.gradle              # 두 모듈이 공유하는 설정
 ├── settings.gradle           # :starter 와 :solution 포함
 ├── gradlew / gradle/         # Gradle 래퍼 (설치 불필요)
-├── .vscode/launch.json       # 두 모듈용 디버그 + 실행 설정
+├── .vscode/launch.json       # VS Code용 디버그 + 실행 설정 (두 모듈)
+├── .run/                     # IntelliJ IDEA 실행 설정 (동일한 6개)
 ├── scripts/                  # bash 헬퍼 (run-worker, start, signal, history, ...)
 ├── starter/
 │   └── src/main/java/foundations/
@@ -166,7 +167,8 @@ temporal workflow result --workflow-id math-wf   # 결과
 
 ### IDE에서 (브레이크포인트에 가장 좋음)
 
-저장소에는 `.vscode/launch.json`이 포함되어 있습니다. **Run and Debug** 패널에서:
+저장소에는 두 에디터용으로 **동일한 6개의 실행 설정**이 들어 있습니다 — VS Code용
+`.vscode/launch.json`, IntelliJ IDEA용 `.run/`. 어느 쪽을 쓰든 흐름은 같습니다:
 
 1. **“Worker (debug) — `<module>`”**를 실행합니다. `TEMPORAL_DEBUG=true`를 설정하여
    *워크플로* 코드의 브레이크포인트가 데드락 감지기(deadlock detector)를 건드리지 않게 합니다.
@@ -174,6 +176,22 @@ temporal workflow result --workflow-id math-wf   # 결과
 3. (랩 3 이상) **“Signal — `<module>`”**를 실행해 시그널을 보냅니다.
 
 코드의 `>>> BREAKPOINT <<<` 표시 지점에 브레이크포인트를 찍으세요.
+
+**VS Code.** *Extension Pack for Java*를 설치하고 저장소 폴더를 연 뒤,
+**Run and Debug** 패널(Ctrl/Cmd-Shift-D)에서 설정을 고르세요. 실행은 초록색 ▶,
+브레이크포인트에서 멈추려면 **Start Debugging**(F5)을 사용합니다.
+
+**IntelliJ IDEA** (Community 또는 Ultimate). 저장소 폴더를 열면 IDEA가 `settings.gradle`을
+인식해 Gradle 프로젝트로 임포트합니다. `starter`와 `solution` 모듈이 생기도록 임포트가
+끝날 때까지 기다리세요. 그러면 `.run/`의 6개 설정이 툴바의 실행 설정 드롭다운에 나타납니다.
+실행은 ▶, 브레이크포인트에서 멈추려면 🐞 **Debug** 버튼을 사용합니다.
+
+> **IDEA 첫 실행 시 참고.** *File → Project Structure → Project*에서 **Project SDK**를
+> JDK 17+ 로 지정하세요. 설정에 “module not specified”가 뜨면 Gradle 임포트가 끝나지
+> 않았거나(또는 모듈 이름이 다르거나) 그런 것이니, **Gradle** 툴 윈도우에서 🔄로 다시
+> 동기화하고 필요하면 설정의 **Module** 드롭다운에서
+> `temporal-java-foundations.<module>.main`을 고르세요. `./gradlew` 태스크(`run`,
+> `runStarter`, `runSignal`)도 **Gradle** 툴 윈도우에 나열되므로 그쪽을 써도 됩니다.
 
 ---
 
@@ -451,7 +469,10 @@ temporal workflow show --workflow-id math-wf          # Temporal CLI로 이벤�
 | `Unsupported class file major version` / Gradle이 시작 안 됨 | `java -version`이 17보다 낮습니다 — JDK 17+ 설치. |
 | 의도하지 *않은* 비결정성 오류 | 실행 중인 워크플로가 있는 상태에서 워크플로 코드를 바꿨습니다. 새 워크플로를 시작하거나 `Workflow.getVersion`으로 변경을 가드하세요. |
 | 시작 시 `WARNING: sun.misc.Unsafe...` | 무해합니다 — 여러분의 코드가 아니라 최신 JDK에서의 gRPC/Netty 라이브러리 경고입니다. |
-| VSCode에 빨간 밑줄이 뜨지만 `./gradlew build`는 성공 | 명령 팔레트 → “Java: Clean Language Server Workspace” 후 리로드. |
+| VS Code에 빨간 밑줄이 뜨지만 `./gradlew build`는 성공 | 명령 팔레트 → “Java: Clean Language Server Workspace” 후 리로드. |
+| IntelliJ에서 심볼을 못 찾지만 `./gradlew build`는 성공 | **Gradle** 툴 윈도우 → 🔄 *Reload All Gradle Projects*. 그래도 안 되면 *File → Invalidate Caches… → Invalidate and Restart*. |
+| IntelliJ 실행 설정에 “module not specified” / “class not found” | Gradle 임포트가 끝나지 않았습니다 — 다시 동기화한 뒤 설정의 **Module** 드롭다운에서 `temporal-java-foundations.<module>.main`을 선택하세요. |
+| IntelliJ에서 *워크플로* 코드 브레이크포인트가 워크플로 태스크를 죽임 | `TEMPORAL_DEBUG=true` 없이 일반 “Run” 설정으로 실행했습니다. `.run/`의 **“Worker (debug) — `<module>`”**를 사용하세요. |
 
 ---
 

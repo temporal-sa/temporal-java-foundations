@@ -7,7 +7,7 @@ import io.temporal.worker.WorkerFactory;
 
 /**
  * Hosts the workflow + activity code. Start this first (or run "Worker (debug)"
- * from the Run and Debug panel), then kick off an execution with {@link Starter}.
+ * from your IDE's run configurations), then kick off an execution with {@link Starter}.
  */
 public class WorkerApp {
 

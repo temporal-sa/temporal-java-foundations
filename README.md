@@ -102,7 +102,8 @@ temporal-java-foundations/
 ├── build.gradle              # shared config for both modules
 ├── settings.gradle           # includes :starter and :solution
 ├── gradlew / gradle/         # Gradle wrapper (no install needed)
-├── .vscode/launch.json       # debug + run configs for both modules
+├── .vscode/launch.json       # VS Code debug + run configs for both modules
+├── .run/                     # IntelliJ IDEA run configs (same six entries)
 ├── scripts/                  # bash helpers (run-worker, start, signal, history, ...)
 ├── starter/
 │   └── src/main/java/foundations/
@@ -166,7 +167,8 @@ temporal workflow result --workflow-id math-wf   # result
 
 ### From the IDE (best for breakpoints)
 
-The repo includes `.vscode/launch.json`. From the **Run and Debug** panel:
+The repo ships the **same six run configurations** for both editors — `.vscode/launch.json`
+for VS Code and `.run/` for IntelliJ IDEA. Whichever you use, the flow is identical:
 
 1. Run **“Worker (debug) — `<module>`”**. It sets `TEMPORAL_DEBUG=true` so breakpoints in
    *workflow* code don't trip the deadlock detector.
@@ -174,6 +176,23 @@ The repo includes `.vscode/launch.json`. From the **Run and Debug** panel:
 3. (Lab 3+) Run **“Signal — `<module>`”** to send the signal.
 
 Set breakpoints on the `>>> BREAKPOINT <<<` markers in the code.
+
+**VS Code.** Install the *Extension Pack for Java*, open the repo folder, and pick a
+configuration from the **Run and Debug** panel (Ctrl/Cmd-Shift-D). Use the green ▶ for
+run, or **Start Debugging** (F5) to stop on breakpoints.
+
+**IntelliJ IDEA** (Community or Ultimate). Open the repo folder — IDEA detects
+`settings.gradle` and imports it as a Gradle project; let the import finish so the
+`starter` and `solution` modules exist. The six configurations from `.run/` then appear in
+the run-configuration dropdown in the toolbar. Use ▶ to run, or the 🐞 **Debug** button to
+stop on breakpoints.
+
+> **First-run notes for IDEA.** Set **Project SDK** to a JDK 17+ under *File → Project
+> Structure → Project*. If a configuration shows “module not specified”, the Gradle import
+> hasn't finished (or used different module names) — re-sync from the **Gradle** tool
+> window (🔄) and, if needed, pick `temporal-java-foundations.<module>.main` in the
+> configuration's **Module** dropdown. The `./gradlew` tasks (`run`, `runStarter`,
+> `runSignal`) are also listed in the **Gradle** tool window if you prefer those.
 
 ---
 
@@ -453,7 +472,10 @@ need the `tdbg` binary / Docker DB from [`PREREQUISITES.md`](./PREREQUISITES.md)
 | `Unsupported class file major version` / Gradle won't start | Your `java -version` is older than 17 — install JDK 17+. |
 | Non-determinism error you *didn't* intend | You changed workflow code while an execution was running. Start a fresh workflow, or guard the change with `Workflow.getVersion`. |
 | `WARNING: sun.misc.Unsafe...` at startup | Harmless — it's the gRPC/Netty library on newer JDKs, not your code. |
-| VSCode shows red squiggles but `./gradlew build` works | Command Palette → “Java: Clean Language Server Workspace”, then reload. |
+| VS Code shows red squiggles but `./gradlew build` works | Command Palette → “Java: Clean Language Server Workspace”, then reload. |
+| IntelliJ shows unresolved symbols but `./gradlew build` works | **Gradle** tool window → 🔄 *Reload All Gradle Projects*. Still broken? *File → Invalidate Caches… → Invalidate and Restart*. |
+| IntelliJ run config says “module not specified” / “class not found” | The Gradle import didn't finish — re-sync, then pick `temporal-java-foundations.<module>.main` in the configuration's **Module** dropdown. |
+| IntelliJ: breakpoint in *workflow* code kills the workflow task | You launched a plain “Run” config without `TEMPORAL_DEBUG=true`. Use **“Worker (debug) — `<module>`”** from `.run/`. |
 
 ---
 
