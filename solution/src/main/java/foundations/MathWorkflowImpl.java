@@ -13,12 +13,13 @@ import java.time.Duration;
  *   Lab 2  doubled = doubleValue(sum)               2 * (a + b)
  *   Lab 3  wait for submit(int), then               2 * (a + b) - submittedValue
  *          result  = doubled - submittedValue
- *   Lab 4  squared = square(result)                (2 * (a + b) - submittedValue) ^ 2
- *          — introduced safely with Workflow.getVersion.
+ *   Lab 5  squared = square(result)                (2 * (a + b) - submittedValue) ^ 2
+ *          — introduced safely with Workflow.getVersion.  (Lab 4 is read-only: it just
+ *          reads the event history of what Labs 1–3 built.)
  *
  * Every activity call is a durable checkpoint: its result is written to history and
  * replayed (not re-run) if the worker restarts. That is why the workflow code must
- * stay deterministic — see Lab 4.
+ * stay deterministic — see Lab 5.
  */
 public class MathWorkflowImpl implements MathWorkflow {
 
@@ -58,14 +59,18 @@ public class MathWorkflowImpl implements MathWorkflow {
 
         // ── Lab 3 ────────────────────────────────────────────────────────────
         // Park until submit(int) arrives. The timeout makes the park record a Timer
-        // in history — that recorded command is what the Lab 4 experiment collides
+        // in history — that recorded command is what the Lab 5 Part A experiment collides
         // with, which is how a non-determinism error becomes observable.
         Workflow.await(Duration.ofHours(1), () -> submitted);
         int result = doubled - submittedValue;                        // 2*(a+b) - value
 
-        // ── Lab 4 (determinism) ──────────────────────────────────────────────
-        // `square` was introduced AFTER executions were already running. getVersion
-        // returns DEFAULT_VERSION when replaying histories written before the change
+        // ── Lab 5 (determinism) ──────────────────────────────────────────────
+        // `square` runs at the very END, so it only ever APPENDS history after the Timer
+        // recorded by the await above — a safe append. (Contrast: the before-the-timer
+        // insert in README Lab 5 Part A collides with that Timer and fails replay.) That
+        // safe append is why even an already-parked execution runs square without error.
+        // getVersion is the general safe-change tool for changes that AREN'T safe appends:
+        // it returns DEFAULT_VERSION when replaying histories written before the change
         // (so they skip square and finish exactly as before), and version 1 for new
         // executions (which run square). One codebase serves old and new histories.
         int version = Workflow.getVersion("add-square-step", Workflow.DEFAULT_VERSION, 1);

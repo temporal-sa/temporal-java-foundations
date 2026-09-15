@@ -51,7 +51,7 @@ The labs come in **two sessions** with a break in between:
 | Lab | You do | Concept |
 |-----|--------|---------|
 | **4** | Read the event history of what you built | Event history: the durable log; replay |
-| **5** | Add a `square` activity, introduced **safely** | Determinism, replay, and `Workflow.getVersion` |
+| **5** | Break replay on purpose, then add a `square` activity **safely** | Determinism, replay, and `Workflow.getVersion` |
 
 ### The finished workflow
 
@@ -335,10 +335,70 @@ temporal workflow show --workflow-id math-wf          # event history via the Te
 
 ### Lab 5 — determinism and versioning
 
-**Goal:** square the result → `(2 × (a + b) − value)²`, introduced **without breaking**
-executions that are already running.
+**Goal:** see *why* workflow code must stay deterministic, then square the result →
+`(2 × (a + b) − value)²`, introduced **without breaking** executions that are already
+running.
 
-#### Part A — add `square` safely
+Workflow code is **replayed** from history on every worker restart, so it must be
+**deterministic**: the commands your code issues must match, in order, the commands already
+recorded in history. We'll break that rule on purpose to *see* the failure first (Part A),
+then add the real `square` feature the safe way (Part B).
+
+#### Part A — witness a non-determinism error (do this first)
+
+The quickest way to understand the rule is to violate it once. This is also the mistake
+people hit by accident — changing workflow code while an execution is still running.
+
+1. Start a fresh workflow and **do not signal it** — leave it parked on `await`:
+   ```bash
+   ./scripts/reset.sh                # clear any earlier run of math-wf
+   ./scripts/start.sh 3 4            # parks
+   ```
+   In the **Web UI**, confirm `math-wf` is **Running** and its history ends with
+   `TimerStarted` (the `await` timeout).
+2. **Stop the worker** (Ctrl-C in its terminal).
+3. Make a *breaking* change: add an extra activity call **before** `Workflow.await(...)`,
+   with no `getVersion` guard — e.g.
+   ```java
+   doubled = activities.doubleValue(new DoubleInput(doubled));  // the "bad" insert
+   Workflow.await(Duration.ofHours(1), () -> submitted);
+   ```
+4. **Restart the worker**, then send the signal:
+   ```bash
+   ./scripts/signal.sh 5
+   ```
+5. Replay reaches the point where history recorded `TimerStarted`, but your new code
+   issues `ScheduleActivityTask(doubleValue)` instead → **non-determinism error**. In the
+   **Web UI**, `math-wf` stays **Running** with a **`WorkflowTaskFailed`** event whose
+   message mentions non-determinism, and the task keeps retrying — the workflow never
+   completes.
+
+   <details>
+   <summary><b>Advanced (optional)</b> — see the failure from the terminal</summary>
+
+   ```bash
+   ./scripts/history.sh math-wf TASK_FAILED   # the WorkflowTaskFailed events
+   ./scripts/describe.sh                        # status: Running, task retrying
+   ```
+   </details>
+6. **Undo** the bad insert, then clear the wedged workflow and restart the worker on the
+   restored (Part 1) code before moving on:
+   ```bash
+   ./scripts/reset.sh
+   ```
+
+**What just happened.** Replay flags a contradiction only when your code issues a command
+that **disagrees with one already recorded**. Your insert put a `ScheduleActivityTask`
+*before* the `TimerStarted` that history already had at that position — they collide. (This
+is also why the `await` keeps its timeout: a bare `await` records no command, so nothing
+would collide and the error would hide.) The rule to carry into Part B: **a change is safe
+when it *appends* commands after the last recorded one, and unsafe when it *inserts* before
+an existing one.**
+
+#### Part B — add `square` safely
+
+Now the real feature. `square` runs at the very end — *after* the last recorded command —
+so it's a **safe append**, the exact opposite of Part A's insert.
 
 1. In `MathActivitiesImpl.java`, implement `square` to return `in.value * in.value`.
 2. In `run(...)`, replace `return result;` with the versioned square step:
@@ -365,59 +425,21 @@ executions that are already running.
    ```
    </details>
 
-#### Part B — witness a non-determinism error (recommended)
+> **Try it on a workflow that's still parked.** Start one *before* you add `square`, leave
+> it parked, then do steps 1–2 and signal it. It runs `square` and completes — **no error**.
+> That surprises people (they expect a non-determinism error like Part A), but it's the
+> safe-append rule at work: `square`'s command lands *after* the timer, so there's nothing to
+> collide with. Appending can never reproduce the Part A failure.
 
-This shows *why* `getVersion` exists. Workflow code is **replayed** on every worker
-restart, so it must be **deterministic**: the commands your code issues must match the
-commands already recorded in history. Change the code under a running workflow the wrong
-way and replay fails.
-
-1. Start a fresh workflow and **do not signal it** — leave it parked on `await`:
-   ```bash
-   ./scripts/reset.sh                # clear any earlier run of math-wf
-   ./scripts/start.sh 3 4            # parks
-   ```
-   In the **Web UI**, confirm `math-wf` is **Running** and its history ends with
-   `TimerStarted`.
-2. **Stop the worker** (Ctrl-C in its terminal).
-3. Make a *breaking* change: add an extra activity call **before** `Workflow.await(...)`,
-   with no `getVersion` guard — e.g.
-   ```java
-   doubled = activities.doubleValue(new DoubleInput(doubled));  // the "bad" insert
-   Workflow.await(Duration.ofHours(1), () -> submitted);
-   ```
-4. **Restart the worker**, then send the signal:
-   ```bash
-   ./scripts/signal.sh 5
-   ```
-5. Replay reaches the point where history recorded `TimerStarted`, but your new code
-   issues `ScheduleActivityTask(doubleValue)` instead → **non-determinism error**. In the
-   **Web UI**, `math-wf` stays **Running** with a **`WorkflowTaskFailed`** event whose
-   message mentions non-determinism, and the task keeps retrying — the workflow never
-   completes.
-
-   <details>
-   <summary><b>Advanced (optional)</b> — see the failure from the terminal</summary>
-
-   ```bash
-   ./scripts/history.sh math-wf TASK_FAILED   # the WorkflowTaskFailed events
-   ./scripts/describe.sh                        # status: Running, task retrying
-   ```
-   </details>
-6. **Undo** the bad insert (and `./scripts/reset.sh` to clear the wedged workflow).
-
-**Why did adding `square` at the end (Part A) *not* break, but this did?**
-Replay only detects a contradiction when your code issues a command that **disagrees with
-one already recorded**. `square` runs *after* the last recorded command (the timer), so it
-just appends new history — safe. The extra activity *before* the timer collides with the
-recorded `TimerStarted` — unsafe. (This is also why the `await` keeps its timeout: a bare
-`await` records no command, so nothing would collide and the error would hide.)
-
-`Workflow.getVersion` is the general tool for any change that isn't a safe append: it
-writes a version marker into history. Executions started **before** the change have no
-marker → `getVersion` returns `DEFAULT_VERSION` → they take the old branch and replay
-cleanly. Executions started **after** get marker `1` → they run the new code. One codebase
-serves both. Compare the histories of an old vs. a new execution in the **Web UI** (or, for
+**Why the append is safe — and where `getVersion` earns its keep.**
+Because `square` only ever **appends** history after the timer, a plain `square` call would
+already replay cleanly here — even for that parked execution. We still wrap it in
+`getVersion` to learn the pattern, because most real changes **aren't** safe appends (the
+before-the-timer insert in Part A is the common case). `getVersion` writes a version marker
+into history: executions started **before** the change have no marker → it returns
+`DEFAULT_VERSION` → they take the old branch (`return result`) and replay cleanly;
+executions started **after** get marker `1` → they run `square`. One codebase serves both,
+safe-append or not. Compare an old vs. a new execution's history in the **Web UI** (or, for
 advanced users, `./scripts/history.sh <id> MARKER_RECORDED`).
 
 ---

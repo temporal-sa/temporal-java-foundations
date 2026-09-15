@@ -52,7 +52,7 @@ Java로 **Temporal**을 배우는 실습형 스타터 랩입니다. **하나의 
 | 랩 | 하는 일 | 개념 |
 |----|---------|------|
 | **4** | 만든 워크플로의 이벤트 히스토리 읽기 | 이벤트 히스토리: 내구성 있는 로그; 리플레이 |
-| **5** | `square` 액티비티를 **안전하게** 도입 | 결정성, 리플레이(replay), `Workflow.getVersion` |
+| **5** | 리플레이를 일부러 깨뜨려 본 뒤, `square` 액티비티를 **안전하게** 도입 | 결정성, 리플레이(replay), `Workflow.getVersion` |
 
 ### 완성된 워크플로
 
@@ -333,10 +333,69 @@ temporal workflow show --workflow-id math-wf          # Temporal CLI로 이벤�
 
 ### 랩 5 — 결정성과 버저닝
 
-**목표:** 결과를 제곱 → `(2 × (a + b) − value)²`. 단, 이미 실행 중인 워크플로를 **깨뜨리지
-않고** 도입합니다.
+**목표:** 워크플로 코드가 *왜* 결정적이어야 하는지 직접 확인한 뒤, 결과를 제곱 →
+`(2 × (a + b) − value)²`. 단, 이미 실행 중인 워크플로를 **깨뜨리지 않고** 도입합니다.
 
-#### 파트 A — `square`를 안전하게 추가
+워크플로 코드는 워커가 재시작될 때마다 히스토리로부터 **리플레이**되므로 **결정적
+(deterministic)** 이어야 합니다: 코드가 발행하는 커맨드는 히스토리에 이미 기록된 커맨드와
+순서까지 일치해야 합니다. 먼저 이 규칙을 일부러 어겨 실패를 *직접 목격*한 뒤(파트 A), 실제
+`square` 기능을 안전한 방법으로 추가합니다(파트 B).
+
+#### 파트 A — 비결정성 오류 목격하기 (먼저 해 보기)
+
+규칙을 이해하는 가장 빠른 길은 한 번 어겨 보는 것입니다. 이것은 사람들이 실수로 겪는 상황이기도
+합니다 — 실행이 아직 진행 중인데 워크플로 코드를 바꾸는 것.
+
+1. 새 워크플로를 시작하되 **시그널을 보내지 마세요** — `await`에서 대기하도록 둡니다:
+   ```bash
+   ./scripts/reset.sh                # 이전 math-wf 실행 정리
+   ./scripts/start.sh 3 4            # 대기(PARK)
+   ```
+   **웹 UI**에서 `math-wf`가 **Running**이고 히스토리가 `TimerStarted`(await 타임아웃)로
+   끝나는지 확인하세요.
+2. **워커를 중지합니다** (워커 터미널에서 Ctrl-C).
+3. *깨뜨리는* 변경을 합니다: `getVersion` 가드 없이 `Workflow.await(...)` **앞에** 액티비티
+   호출을 하나 더 추가합니다 — 예:
+   ```java
+   doubled = activities.doubleValue(new DoubleInput(doubled));  // "잘못된" 삽입
+   Workflow.await(Duration.ofHours(1), () -> submitted);
+   ```
+4. **워커를 재시작**한 뒤 시그널을 보냅니다:
+   ```bash
+   ./scripts/signal.sh 5
+   ```
+5. 리플레이가 히스토리에 `TimerStarted`가 기록된 지점에 도달하는데, 새 코드는 대신
+   `ScheduleActivityTask(doubleValue)`를 발행합니다 → **비결정성 오류(non-determinism
+   error)**. **웹 UI**에서 `math-wf`는 **Running** 상태로 남고, 비결정성을 언급하는
+   **`WorkflowTaskFailed`** 이벤트가 보이며 태스크가 계속 재시도됩니다 — 워크플로는 완료되지
+   않습니다.
+
+   <details>
+   <summary><b>고급 (선택)</b> — 실패를 터미널에서 보기</summary>
+
+   ```bash
+   ./scripts/history.sh math-wf TASK_FAILED   # WorkflowTaskFailed 이벤트
+   ./scripts/describe.sh                        # 상태: Running, 태스크 재시도 중
+   ```
+   </details>
+6. 잘못된 삽입을 **되돌린** 뒤, 멈춰버린 워크플로를 정리하고 복원된(파트 1) 코드로 워커를
+   재시작한 다음 진행하세요:
+   ```bash
+   ./scripts/reset.sh
+   ```
+
+**방금 무슨 일이 있었나요.** 리플레이는 코드가 **이미 기록된 커맨드와 어긋나는** 커맨드를
+발행할 때만 모순을 잡아냅니다. 여러분의 삽입은 히스토리가 그 위치에 이미 갖고 있던
+`TimerStarted` *앞에* `ScheduleActivityTask`를 놓았고 — 둘이 충돌합니다. (`await`에 타임아웃을
+유지하는 이유이기도 합니다: 타임아웃 없는 `await`는 아무 커맨드도 기록하지 않아 충돌할 대상이
+없고, 그러면 오류가 드러나지 않습니다.) 파트 B로 가져갈 규칙: **변경은 마지막으로 기록된
+커맨드 *뒤에* 커맨드를 *덧붙일* 때 안전하고, 기존 커맨드 *앞에* *삽입할* 때 안전하지
+않습니다.**
+
+#### 파트 B — `square`를 안전하게 추가
+
+이제 실제 기능입니다. `square`는 맨 끝에서 — 마지막으로 기록된 커맨드 *뒤에서* — 실행되므로
+**안전한 덧붙이기(safe append)** 이며, 파트 A의 삽입과 정반대입니다.
 
 1. `MathActivitiesImpl.java`에서 `square`가 `in.value * in.value`를 반환하도록 구현합니다.
 2. `run(...)`에서 `return result;`를 버전 처리된 제곱 단계로 교체합니다:
@@ -363,57 +422,20 @@ temporal workflow show --workflow-id math-wf          # Temporal CLI로 이벤�
    ```
    </details>
 
-#### 파트 B — 비결정성 오류 목격하기 (권장)
+> **아직 대기 중인 워크플로에서 시도해 보세요.** `square`를 추가하기 *전에* 하나를 시작해
+> 대기 상태로 둔 다음, 1–2단계를 하고 시그널을 보내세요. `square`를 실행하고 완료됩니다 —
+> **오류 없이**. 사람들은 파트 A처럼 비결정성 오류를 기대하기 때문에 놀라지만, 이것이 바로
+> 안전한 덧붙이기 규칙입니다: `square`의 커맨드는 타이머 *뒤에* 놓이므로 충돌할 대상이
+> 없습니다. 덧붙이기는 결코 파트 A의 실패를 재현할 수 없습니다.
 
-이 실습은 `getVersion`이 *왜* 존재하는지 보여 줍니다. 워크플로 코드는 워커가 재시작될
-때마다 **리플레이**되므로 **결정적(deterministic)** 이어야 합니다: 코드가 발행하는 커맨드는
-히스토리에 이미 기록된 커맨드와 일치해야 합니다. 실행 중인 워크플로 아래에서 코드를 잘못
-바꾸면 리플레이가 실패합니다.
-
-1. 새 워크플로를 시작하되 **시그널을 보내지 마세요** — `await`에서 대기하도록 둡니다:
-   ```bash
-   ./scripts/reset.sh                # 이전 math-wf 실행 정리
-   ./scripts/start.sh 3 4            # 대기(PARK)
-   ```
-   **웹 UI**에서 `math-wf`가 **Running**이고 히스토리가 `TimerStarted`로 끝나는지 확인하세요.
-2. **워커를 중지합니다** (워커 터미널에서 Ctrl-C).
-3. *깨뜨리는* 변경을 합니다: `getVersion` 가드 없이 `Workflow.await(...)` **앞에** 액티비티
-   호출을 하나 더 추가합니다 — 예:
-   ```java
-   doubled = activities.doubleValue(new DoubleInput(doubled));  // "잘못된" 삽입
-   Workflow.await(Duration.ofHours(1), () -> submitted);
-   ```
-4. **워커를 재시작**한 뒤 시그널을 보냅니다:
-   ```bash
-   ./scripts/signal.sh 5
-   ```
-5. 리플레이가 히스토리에 `TimerStarted`가 기록된 지점에 도달하는데, 새 코드는 대신
-   `ScheduleActivityTask(doubleValue)`를 발행합니다 → **비결정성 오류(non-determinism
-   error)**. **웹 UI**에서 `math-wf`는 **Running** 상태로 남고, 비결정성을 언급하는
-   **`WorkflowTaskFailed`** 이벤트가 보이며 태스크가 계속 재시도됩니다 — 워크플로는 완료되지
-   않습니다.
-
-   <details>
-   <summary><b>고급 (선택)</b> — 실패를 터미널에서 보기</summary>
-
-   ```bash
-   ./scripts/history.sh math-wf TASK_FAILED   # WorkflowTaskFailed 이벤트
-   ./scripts/describe.sh                        # 상태: Running, 태스크 재시도 중
-   ```
-   </details>
-6. 잘못된 삽입을 **되돌립니다** (그리고 `./scripts/reset.sh`로 멈춰버린 워크플로를 정리).
-
-**왜 파트 A에서 `square`를 끝에 추가했을 때는 안 깨졌는데, 이건 깨졌을까요?**
-리플레이는 코드가 **이미 기록된 커맨드와 어긋나는** 커맨드를 발행할 때만 모순을 감지합니다.
-`square`는 마지막으로 기록된 커맨드(타이머) *뒤에서* 실행되므로 새 히스토리를 덧붙이기만
-합니다 — 안전합니다. 반면 타이머 *앞에* 추가한 액티비티는 기록된 `TimerStarted`와 충돌합니다
-— 안전하지 않습니다. (`await`에 타임아웃을 유지하는 이유이기도 합니다: 타임아웃 없는
-`await`는 아무 커맨드도 기록하지 않아 충돌할 대상이 없고, 그러면 오류가 드러나지 않습니다.)
-
-`Workflow.getVersion`은 안전한 덧붙이기가 아닌 모든 변경에 쓰는 범용 도구입니다: 히스토리에
-버전 마커를 기록합니다. 변경 **이전에** 시작된 실행에는 마커가 없어 → `getVersion`이
-`DEFAULT_VERSION`을 반환 → 옛 분기를 타서 깔끔하게 리플레이됩니다. 변경 **이후에** 시작된
-실행은 마커 `1`을 받아 → 새 코드를 실행합니다. 하나의 코드베이스가 둘 다를 처리합니다.
+**덧붙이기가 안전한 이유 — 그리고 `getVersion`이 제 몫을 하는 지점.**
+`square`는 언제나 타이머 뒤에 히스토리를 **덧붙이기만** 하므로, 사실 가드 없는 순수한 `square`
+호출도 여기서는 — 그 대기 중인 실행에서조차 — 깔끔하게 리플레이됩니다. 그래도 패턴을 익히기
+위해 `getVersion`으로 감쌉니다. 대부분의 실제 변경은 안전한 덧붙이기가 **아니기** 때문입니다
+(파트 A의 타이머-앞 삽입이 흔한 경우입니다). `getVersion`은 히스토리에 버전 마커를 기록합니다:
+변경 **이전에** 시작된 실행에는 마커가 없어 → `DEFAULT_VERSION`을 반환 → 옛 분기(`return
+result`)를 타서 깔끔하게 리플레이됩니다. 변경 **이후에** 시작된 실행은 마커 `1`을 받아 →
+`square`를 실행합니다. 안전한 덧붙이기든 아니든, 하나의 코드베이스가 둘 다를 처리합니다.
 **웹 UI**에서(또는 고급: `./scripts/history.sh <id> MARKER_RECORDED`) 옛 실행과 새 실행의
 히스토리를 비교해 보세요.
 

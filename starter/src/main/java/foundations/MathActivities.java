@@ -23,7 +23,7 @@ public interface MathActivities {
     @ActivityMethod
     int doubleValue(DoubleInput in);
 
-    /** Lab 4: value * value */
+    /** Lab 5: value * value */
     @ActivityMethod
     int square(SquareInput in);
 }

@@ -1,6 +1,6 @@
 package foundations;
 
-/** Lab 4 input struct: the value to square. */
+/** Lab 5 input struct: the value to square. */
 public class SquareInput {
     public int value;
 

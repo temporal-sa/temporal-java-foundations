@@ -23,7 +23,7 @@ public class MathActivitiesImpl implements MathActivities {
 
     @Override
     public int square(SquareInput in) {
-        // TODO Lab 4: return in.value multiplied by itself.
-        throw new UnsupportedOperationException("TODO Lab 4: implement square");
+        // TODO Lab 5: return in.value multiplied by itself.
+        throw new UnsupportedOperationException("TODO Lab 5: implement square");
     }
 }

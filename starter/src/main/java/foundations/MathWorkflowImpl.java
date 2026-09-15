@@ -12,7 +12,7 @@ import java.time.Duration;
  *   Lab 1  sum     = add(a, b)                       a + b
  *   Lab 2  doubled = doubleValue(sum)               2 * (a + b)
  *   Lab 3  wait for submit(int), then subtract      2 * (a + b) - submittedValue
- *   Lab 4  square the result (safely, via getVersion)  ... ^ 2
+ *   Lab 5  square the result (safely, via getVersion)  ... ^ 2  (Lab 4 is read-only)
  */
 public class MathWorkflowImpl implements MathWorkflow {
 
@@ -51,10 +51,16 @@ public class MathWorkflowImpl implements MathWorkflow {
         // TODO Lab 3: park until the signal arrives, then subtract:
         //   Workflow.await(Duration.ofHours(1), () -> submitted);
         //   int result = doubled - submittedValue;   // 2*(a+b) - value
-        // The timeout on await() matters — see the README Lab 4 determinism note.
+        // The timeout on await() matters — see the README Lab 5 determinism note.
 
-        // ── Lab 4 (determinism) ──────────────────────────────────────────────
-        // TODO Lab 4: square the result, introduced safely with getVersion:
+        // ── Lab 5 (determinism) ──────────────────────────────────────────────
+        // TODO Lab 5 Part A (experiment, then undo): with a workflow parked on the await
+        //   above, add a *bad* activity call BEFORE the await, restart the worker, and
+        //   signal it. Replay collides with the recorded TimerStarted → a non-determinism
+        //   error. Walk through it in README Lab 5 Part A, then undo the bad insert.
+        // TODO Lab 5 Part B: square the result, introduced safely with getVersion. Note
+        //   this call sits at the very END, so it only appends history — a safe append,
+        //   the opposite of the Part A insert:
         //   int version = Workflow.getVersion("add-square-step",
         //                                      Workflow.DEFAULT_VERSION, 1);
         //   if (version == Workflow.DEFAULT_VERSION) return result;
