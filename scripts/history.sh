@@ -18,13 +18,21 @@ need_tdbg
 WID="${1:-$WORKFLOW_ID_DEFAULT}"
 FILTER="${2:-}"
 
-# Closed executions need an explicit run id; resolve the latest one if we can.
+# `tdbg execution show` reads straight from the DB and requires an explicit run id (it does
+# not resolve "latest" like the Web UI or the `temporal` CLI). Resolve it now; without one
+# tdbg fails with a cryptic "Invalid RunId".
 RID="$(current_run_id "$WID")"
-RID_ARGS=()
-[ -n "$RID" ] && RID_ARGS=(--run-id "$RID")
+if [ -z "$RID" ]; then
+  echo "error: could not resolve a run id for workflow '$WID'." >&2
+  echo "  'tdbg execution show' needs --run-id. Check the workflow exists (temporal workflow list)" >&2
+  echo "  and that the 'temporal' CLI is installed so this script can look the run id up." >&2
+  exit 1
+fi
 
+# NOTE: --address and -n/--namespace are GLOBAL tdbg flags — they must come BEFORE the
+# `execution` subcommand, not after it.
 CMD=("$TDBG" --address "$TEMPORAL_ADDRESS" -n "$TEMPORAL_NAMESPACE"
-     execution show --workflow-id "$WID" "${RID_ARGS[@]}" --decode)
+     execution show --workflow-id "$WID" --run-id "$RID" --decode)
 
 if [ -n "$FILTER" ]; then
   "${CMD[@]}" | grep -iA4 "$FILTER"

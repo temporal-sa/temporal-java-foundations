@@ -10,6 +10,8 @@ WID="${1:-$WORKFLOW_ID_DEFAULT}"
 
 if [ -x "$TDBG" ]; then
   echo "== tdbg execution describe (decoded mutable state) =="
+  # --address and -n/--namespace are GLOBAL tdbg flags — they go BEFORE the `execution`
+  # subcommand. Unlike `execution show`, `describe` defaults to the latest run, so no run id.
   "$TDBG" --address "$TEMPORAL_ADDRESS" -n "$TEMPORAL_NAMESPACE" \
     execution describe --workflow-id "$WID" || true
   echo

@@ -485,7 +485,11 @@ temporal workflow show --workflow-id math-wf          # Temporal CLI로 이벤�
   ```bash
   temporal workflow signal --workflow-id math-wf --name submit --input 5
   ```
-- **고급:** `tdbg`로 원시 히스토리 해독(`history.sh`가 감싸는 명령):
+- **고급:** `tdbg`로 원시 히스토리 해독(`history.sh`가 감싸는 명령). tdbg가 엄격하게 요구하는 두 가지:
+  `-n`/`--namespace`는 **전역** 플래그라 `execution` 하위 명령 **앞**에 와야 하고, `execution show`는
+  DB에서 직접 읽기 때문에 (웹 UI와 달리) **run id**가 필요합니다. `history.sh`가 run id를 대신 찾아 주며,
+  원시 형태는 다음과 같습니다:
   ```bash
-  ~/temporal-oss/temporal/tdbg -n default execution show --workflow-id math-wf --decode
+  RID=$(temporal workflow describe --workflow-id math-wf -o json | sed -n 's/.*"runId": *"\([0-9a-fA-F-]*\)".*/\1/p' | head -1)
+  ~/temporal-oss/temporal/tdbg -n default execution show --workflow-id math-wf --run-id "$RID" --decode
   ```

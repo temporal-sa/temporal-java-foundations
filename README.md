@@ -488,7 +488,11 @@ need the `tdbg` binary / Docker DB from [`PREREQUISITES.md`](./PREREQUISITES.md)
   ```bash
   temporal workflow signal --workflow-id math-wf --name submit --input 5
   ```
-- **Advanced:** decode raw history via `tdbg` (what `history.sh` wraps):
+- **Advanced:** decode raw history via `tdbg` (what `history.sh` wraps). Two gotchas tdbg
+  is strict about: `-n`/`--namespace` is a **global** flag, so it goes **before** the
+  `execution` subcommand; and `execution show` reads straight from the DB, so it needs the
+  **run id** (unlike the Web UI). `history.sh` resolves the run id for you — the raw form is:
   ```bash
-  ~/temporal-oss/temporal/tdbg -n default execution show --workflow-id math-wf --decode
+  RID=$(temporal workflow describe --workflow-id math-wf -o json | sed -n 's/.*"runId": *"\([0-9a-fA-F-]*\)".*/\1/p' | head -1)
+  ~/temporal-oss/temporal/tdbg -n default execution show --workflow-id math-wf --run-id "$RID" --decode
   ```
